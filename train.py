@@ -4,7 +4,8 @@ from utils import (get_model_and_tokenizer,
                     get_tokenized_ds,
                     get_dataloader,
                     get_optimizer_and_schedule,
-                    to_gpu)
+                    to_gpu,
+                    eval)
 from sklearn.metrics import accuracy_score
 import torch
 from tqdm import tqdm
@@ -26,6 +27,7 @@ datasets_paths={
 EPOCHES=2
 BATCH_SIZE=32
 SAVE_PATH='checkpoints/'
+LOG_PATH='/cfs/cfs'
 
 if not os.path.exists(SAVE_PATH):
     os.mkdir(SAVE_PATH)
@@ -46,7 +48,7 @@ if __name__=='__main__':
     num_train_step_per_epoch=(len(label)//BATCH_SIZE)+1
     optimizer, lr_schedule = get_optimizer_and_schedule(model, num_train_steps)
 
-    writer=SummaryWriter()
+    writer=SummaryWriter(LOG_PATH)
 
     total_loss=0
     for i in range(EPOCHES):
@@ -70,7 +72,7 @@ if __name__=='__main__':
         model.save_pretrained(save_path)
         tokenizer.save_pretrained(save_path)
 
-
-
-
+        eval_acc=eval(model, tokenizer)
+        print('Eval results: ', eval_acc)
+        writer.add_scalar('Eval_acc', eval_acc, i)
             
