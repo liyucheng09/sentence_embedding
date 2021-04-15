@@ -25,13 +25,15 @@ n_components=384
 
 if __name__=='__main__':
 
-    ds, = sys.argv[1:]
+    ds, model_name = sys.argv[1:]
 
-    model, tokenizer = get_model_and_tokenizer(cache_dir=cache_dir)
+    model, tokenizer = get_model_and_tokenizer(model_name)
     input_a, input_b, label = get_tokenized_ds(datasets_paths[ds]['scripts'], datasets_paths[ds]['data_path'], tokenizer, ds)
 
     with torch.no_grad():
         a_vecs, b_vecs = get_vectors(model, input_a, input_b)
+    a_vecs=a_vecs.cpu().numpy()
+    b_vecs=b_vecs.cpu().numpy()
     kernel, bias = compute_kernel_bias([a_vecs, b_vecs])
 
     kernel=kernel[:, :n_components]

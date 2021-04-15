@@ -11,12 +11,13 @@ def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None):
 
     model=SentencePairEmbedding.from_pretrained(model_name, cache_dir=cache_dir)
     tokenizer=BertTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
+    if torch.cuda.is_available(): model.to('cuda')
     model.eval()
     return model, tokenizer
 
 def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
     ds=load_dataset(scripts, data_path=path)[ds]
-    # ds=ds[:1000]
+#     ds=ds[:1000]
     
     tokenized_a=tokenizer(ds['texta'], max_length=max_length, padding=True, truncation=True, return_tensors='pt')
     tokenized_b=tokenizer(ds['textb'], max_length=max_length, padding=True, truncation=True, return_tensors='pt')
@@ -25,14 +26,21 @@ def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
 
 def get_vectors(model, tokenized_a, tokenized_b):
     ds=SentencePairDataset(tokenized_a, tokenized_b)
-    dl = DataLoader(ds, batch_size=8)
+    dl = DataLoader(ds, batch_size=16)
     a_results=[]
     b_results=[]
     for batch in tqdm(dl):
+        if torch.cuda.is_available():
+            batch=[to_gpu(i) for i in batch]
         a_embedding, b_embedding = model(batch[0], batch[1])
         a_results.append(a_embedding)
         b_results.append(b_embedding)
     return torch.cat(a_results), torch.cat(b_results)
+
+def to_gpu(inputs):
+    return {
+        k:v.to('cuda') for k,v in inputs.items()
+    }
 
 class SentencePairDataset(Dataset):
     def __init__(self, tokenized_a, tokenized_b):
@@ -54,8 +62,7 @@ class SentencePairDataset(Dataset):
         return input_a, input_b
         
 def compute_kernel_bias(vecs):
-    vecs=torch.cat(vecs)
-    vecs=vecs.detach().numpy()
+    vecs=np.concatenate(vecs)
     mean=vecs.mean(axis=0, keepdims=True)
     cov=np.cov(vecs.T)
     u, s, vh = np.linalg.svd(cov)
@@ -63,7 +70,6 @@ def compute_kernel_bias(vecs):
     return W, -mean
 
 def transform_and_normalize(vecs, kernel, bias):
-    vecs=vecs.numpy()
     vecs = (vecs + bias).dot(kernel)
     norms = (vecs**2).sum(axis=1, keepdims=True)**0.5
     return vecs / np.clip(norms, 1e-8, np.inf)
