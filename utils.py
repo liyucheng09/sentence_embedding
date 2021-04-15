@@ -5,11 +5,13 @@ from tqdm import tqdm
 from model import SentencePairEmbedding
 import numpy as np
 import torch
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import LambdaLR
 
 
-def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None):
+def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None, is_train=False):
 
-    model=SentencePairEmbedding.from_pretrained(model_name, cache_dir=cache_dir)
+    model=SentencePairEmbedding.from_pretrained(model_name, cache_dir=cache_dir, is_train=is_train)
     tokenizer=BertTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
     if torch.cuda.is_available(): model.to('cuda')
     model.eval()
@@ -17,7 +19,7 @@ def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None):
 
 def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
     ds=load_dataset(scripts, data_path=path)[ds]
-#     ds=ds[:1000]
+    ds=ds[:100]
     
     tokenized_a=tokenizer(ds['texta'], max_length=max_length, padding=True, truncation=True, return_tensors='pt')
     tokenized_b=tokenizer(ds['textb'], max_length=max_length, padding=True, truncation=True, return_tensors='pt')
@@ -43,9 +45,10 @@ def to_gpu(inputs):
     }
 
 class SentencePairDataset(Dataset):
-    def __init__(self, tokenized_a, tokenized_b):
+    def __init__(self, tokenized_a, tokenized_b, label=None):
         self.tokenized_a=tokenized_a
         self.tokenized_b=tokenized_b
+        self.label=label
 
         assert tokenized_a['input_ids'].shape[0] == tokenized_b['input_ids'].shape[0]
 
@@ -59,7 +62,17 @@ class SentencePairDataset(Dataset):
         input_b={
             k:v[index] for k,v in self.tokenized_b.items()
         }
-        return input_a, input_b
+        output=(input_a, input_b, )
+        if self.label is not None:
+            output+=(torch.LongTensor([self.label[index]]), )
+        return output
+
+def get_dataloader(tokenized_a, tokenized_b, batch_size=16, label=None):
+    ds=SentencePairDataset(tokenized_a, tokenized_b, label=label)
+    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
+
+    return dl
+
         
 def compute_kernel_bias(vecs):
     vecs=np.concatenate(vecs)
@@ -73,3 +86,27 @@ def transform_and_normalize(vecs, kernel, bias):
     vecs = (vecs + bias).dot(kernel)
     norms = (vecs**2).sum(axis=1, keepdims=True)**0.5
     return vecs / np.clip(norms, 1e-8, np.inf)
+
+def get_optimizer_and_schedule(model, num_training_steps, num_warmup_steps=3000):
+    optimizer=AdamW(
+        [
+            {
+                'params': [param for name, param in model.named_parameters() if 'sbert' not in name], 'lr': 5e-5
+
+            },
+            {
+                'params': [param for name, param in model.named_parameters() if 'sbert' in name], 'lr': 1e-3
+            }
+        ]
+    )
+
+    def lr_lambda(current_step: int):
+        if current_step < num_warmup_steps:
+            return float(current_step) / float(max(1, num_warmup_steps))
+        return max(
+            0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps))
+        )
+    
+    lr_schedule=LambdaLR(optimizer, lr_lambda, last_epoch=-1)
+
+    return optimizer, lr_schedule

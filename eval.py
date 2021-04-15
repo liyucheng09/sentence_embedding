@@ -16,8 +16,8 @@ datasets_paths={
         'data_path': 'data/ATEC/atec_nlp_sim_train.csv'
     },
     'similar_query':{
-        'scripts': '',
-        'data_path': ''
+        'scripts': 'data/SimQuery/simquery_dataset.py',
+        'data_path': 'data/SimQuery/processed_simquery.csv'
     }
 }
 
