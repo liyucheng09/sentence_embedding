@@ -8,6 +8,8 @@ import torch
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from sklearn.metrics import accuracy_score
+import os
+import pickle
 
 datasets_paths={
     'atec': {
@@ -30,12 +32,25 @@ def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None, is_t
     return model, tokenizer
 
 def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
+    cache_path=path+'.cache'
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            ds=pickle.load(f)
+        return ds['tokenized_a'], ds['tokenized_b'], ds['label']
+
     ds=load_dataset(scripts, data_path=path)[ds]
-    ds=ds[:100]
     
     tokenized_a=tokenizer(ds['texta'], max_length=max_length, padding=True, truncation=True, return_tensors='pt')
     tokenized_b=tokenizer(ds['textb'], max_length=max_length, padding=True, truncation=True, return_tensors='pt')
     label=ds['label']
+    ds={
+        'tokenized_a': tokenized_a,
+        'tokenized_b': tokenized_b,
+        'label': label
+    }
+    with open(cache_path, 'wb') as f:
+        pickle.dump(ds, f)
+
     return tokenized_a, tokenized_b, label
 
 def get_vectors(model, tokenized_a, tokenized_b):
@@ -80,6 +95,7 @@ class SentencePairDataset(Dataset):
         return output
 
 def get_dataloader(tokenized_a, tokenized_b, batch_size=16, label=None):
+    # TODO: pin memory
     ds=SentencePairDataset(tokenized_a, tokenized_b, label=label)
     dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
 

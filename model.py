@@ -16,6 +16,8 @@ class SentencePairEmbedding(BertModel):
             self.cross_entropy_loss=nn.CrossEntropyLoss()
 
     def forward(self, texta, textb, label=None, pool='first_last_avg_pooling'):
+        if self.is_train: pool='mean'
+
         output1 = super(SentencePairEmbedding, self).forward(**texta, output_hidden_states=True)
         output2 = super(SentencePairEmbedding, self).forward(**textb, output_hidden_states=True)
 

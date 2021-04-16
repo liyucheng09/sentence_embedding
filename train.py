@@ -37,12 +37,15 @@ if __name__=='__main__':
     ds, model_name = sys.argv[1:]
 
     model, tokenizer = get_model_and_tokenizer(model_name, cache_dir=cache_dir, is_train=True)
+
+    # TODO: to DataParalle or ddp
     input_a, input_b, label = get_tokenized_ds(datasets_paths[ds]['scripts'], datasets_paths[ds]['data_path'], tokenizer, ds)
 
     dl=get_dataloader(input_a, input_b, batch_size=BATCH_SIZE, label=label)
 
     is_gpu=torch.cuda.is_available()
-    if is_gpu: model.to('cuda')
+    if is_gpu:
+        model.to('cuda')
 
     num_train_steps=((len(label)//BATCH_SIZE)+1)*EPOCHES
     num_train_step_per_epoch=(len(label)//BATCH_SIZE)+1
