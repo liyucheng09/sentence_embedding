@@ -15,30 +15,36 @@ datasets_paths={
         'scripts': 'data/ATEC/atec_dataset.py',
         'data_path': 'data/ATEC/atec_nlp_sim_train.csv'
     },
-    'similar_query':{
+    'simquery':{
         'scripts': 'data/SimQuery/simquery_dataset.py',
         'data_path': 'data/SimQuery/processed_simquery.csv'
     }
 }
 
-n_components=384
+n_components=768
+pool='mean'
 
 if __name__=='__main__':
 
     ds, model_name = sys.argv[1:]
 
-    model, tokenizer = get_model_and_tokenizer(model_name)
+    model, tokenizer = get_model_and_tokenizer(model_name, cache_dir=cache_dir)
     input_a, input_b, label = get_tokenized_ds(datasets_paths[ds]['scripts'], datasets_paths[ds]['data_path'], tokenizer, ds)
 
     with torch.no_grad():
-        a_vecs, b_vecs = get_vectors(model, input_a, input_b)
+        a_vecs, b_vecs = get_vectors(model, input_a, input_b, pool=pool)
     a_vecs=a_vecs.cpu().numpy()
     b_vecs=b_vecs.cpu().numpy()
-    kernel, bias = compute_kernel_bias([a_vecs, b_vecs])
+    if n_components:
+        kernel, bias = compute_kernel_bias([a_vecs, b_vecs])
 
-    kernel=kernel[:, :n_components]
-    a_vecs=transform_and_normalize(a_vecs, kernel, bias)
-    b_vecs=transform_and_normalize(b_vecs, kernel, bias)
-    sims=(a_vecs * b_vecs).sum(axis=1)
+        kernel=kernel[:, :n_components]
+        a_vecs=transform_and_normalize(a_vecs, kernel, bias)
+        b_vecs=transform_and_normalize(b_vecs, kernel, bias)
+        sims=(a_vecs * b_vecs).sum(axis=1)
 
-    print(accuracy_score(sims>0.5, label))
+        print(accuracy_score(sims>0.5, label))
+    else:
+        sims=(a_vecs * b_vecs).sum(axis=1)
+
+        print(accuracy_score(sims>0.5, label))

@@ -28,7 +28,8 @@ def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None, is_t
     model=SentencePairEmbedding.from_pretrained(model_name, cache_dir=cache_dir, is_train=is_train)
     tokenizer=BertTokenizer.from_pretrained(model_name, cache_dir=cache_dir)
     if torch.cuda.is_available(): model.to('cuda')
-    model.eval()
+    if not is_train:
+        model.eval()
     return model, tokenizer
 
 def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
@@ -36,7 +37,7 @@ def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as f:
             ds=pickle.load(f)
-        print('Reusing cached dataset. Num instances: ', len(ds['label']))
+        print(f'Reusing cached dataset: {cache_path}. Num instances: {len(ds["label"])}')
         return ds['tokenized_a'], ds['tokenized_b'], ds['label']
 
     ds=load_dataset(scripts, data_path=path)[ds]
@@ -54,7 +55,7 @@ def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
 
     return tokenized_a, tokenized_b, label
 
-def get_vectors(model, tokenized_a, tokenized_b):
+def get_vectors(model, tokenized_a, tokenized_b, pool='first_last_avg_pooling'):
     ds=SentencePairDataset(tokenized_a, tokenized_b)
     dl = DataLoader(ds, batch_size=16)
     a_results=[]
@@ -62,7 +63,7 @@ def get_vectors(model, tokenized_a, tokenized_b):
     for batch in tqdm(dl):
         if torch.cuda.is_available():
             batch=[to_gpu(i) for i in batch]
-        a_embedding, b_embedding = model(batch[0], batch[1])
+        a_embedding, b_embedding = model(batch[0], batch[1], pool=pool)
         a_results.append(a_embedding)
         b_results.append(b_embedding)
     return torch.cat(a_results), torch.cat(b_results)
@@ -143,19 +144,22 @@ def get_optimizer_and_schedule(model, num_training_steps, num_warmup_steps=3000)
 
     return optimizer, lr_schedule
 
-def eval(model, tokenizer, ds='atec'):
-    n_components=384
+def eval(model, tokenizer, ds='atec', n_components=768):
+    model.eval()
     input_a, input_b, label = get_tokenized_ds(datasets_paths[ds]['scripts'], datasets_paths[ds]['data_path'], tokenizer, ds)
 
     with torch.no_grad():
         a_vecs, b_vecs = get_vectors(model, input_a, input_b)
     a_vecs=a_vecs.cpu().numpy()
     b_vecs=b_vecs.cpu().numpy()
-    kernel, bias = compute_kernel_bias([a_vecs, b_vecs])
+    if n_components:
+        kernel, bias = compute_kernel_bias([a_vecs, b_vecs])
 
-    kernel=kernel[:, :n_components]
-    a_vecs=transform_and_normalize(a_vecs, kernel, bias)
-    b_vecs=transform_and_normalize(b_vecs, kernel, bias)
-    sims=(a_vecs * b_vecs).sum(axis=1)
+        kernel=kernel[:, :n_components]
+        a_vecs=transform_and_normalize(a_vecs, kernel, bias)
+        b_vecs=transform_and_normalize(b_vecs, kernel, bias)
+        sims=(a_vecs * b_vecs).sum(axis=1)
+    else:
+        sims=(a_vecs * b_vecs).sum(axis=1)
 
     return accuracy_score(sims>0.5, label)

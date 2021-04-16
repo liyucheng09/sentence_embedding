@@ -27,7 +27,7 @@ datasets_paths={
 EPOCHES=2
 BATCH_SIZE=32
 SAVE_PATH='checkpoints/'
-LOG_PATH='/cfs/cfs-dtmr08t1/se_log/'
+LOG_PATH='/cfs/cfs-dtmr08t1/se_log/wo-W/'
 
 if not os.path.exists(SAVE_PATH):
     os.mkdir(SAVE_PATH)
@@ -62,8 +62,9 @@ if __name__=='__main__':
         for index, batch in enumerate(tqdm(dl, desc=f'Training.')):
             if is_gpu:
                 batch=[to_gpu(i) for i in batch]
+            model.train()
             input_a, input_b, label = batch
-            sentence_a, sentence_b, loss = model(input_a, input_b, label=label)
+            sentence_a, sentence_b, loss = model(input_a, input_b, label=label, pool='mean')
             
             if multi_gpu:
                 loss=loss.mean()
@@ -78,8 +79,8 @@ if __name__=='__main__':
 
             lr_schedule.step()
             
-            if (num_train_step_per_epoch*i + index) % 500 == 0:
-                eval_acc=eval(model, tokenizer)
+            if (num_train_step_per_epoch*i + index) % 1000 == 0:
+                eval_acc=eval(model, tokenizer, n_components=768)
                 print('Eval results: ', eval_acc)
                 writer.add_scalar('Eval_acc', eval_acc, num_train_step_per_epoch*i + index)
         
