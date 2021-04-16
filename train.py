@@ -27,7 +27,7 @@ datasets_paths={
 EPOCHES=2
 BATCH_SIZE=32
 SAVE_PATH='checkpoints/'
-LOG_PATH='/cfs/cfs'
+LOG_PATH='/cfs/cfs-dtmr08t1/se_log/'
 
 if not os.path.exists(SAVE_PATH):
     os.mkdir(SAVE_PATH)
@@ -44,8 +44,12 @@ if __name__=='__main__':
     dl=get_dataloader(input_a, input_b, batch_size=BATCH_SIZE, label=label)
 
     is_gpu=torch.cuda.is_available()
+    multi_gpu=False
     if is_gpu:
         model.to('cuda')
+    if torch.cuda.device_count()>1:
+        multi_gpu=True
+        model=torch.nn.DataParallel(model)
 
     num_train_steps=((len(label)//BATCH_SIZE)+1)*EPOCHES
     num_train_step_per_epoch=(len(label)//BATCH_SIZE)+1
@@ -60,6 +64,9 @@ if __name__=='__main__':
                 batch=[to_gpu(i) for i in batch]
             input_a, input_b, label = batch
             sentence_a, sentence_b, loss = model(input_a, input_b, label=label)
+            
+            if multi_gpu:
+                loss=loss.mean()
 
             writer.add_scalar('train_loss', loss, num_train_step_per_epoch*i + index)
             writer.add_scalar('train_lr', lr_schedule.get_last_lr()[0], num_train_step_per_epoch*i + index)
@@ -70,12 +77,16 @@ if __name__=='__main__':
             optimizer.step()
 
             lr_schedule.step()
+            
+            if (num_train_step_per_epoch*i + index) % 500 == 0:
+                eval_acc=eval(model, tokenizer)
+                print('Eval results: ', eval_acc)
+                writer.add_scalar('Eval_acc', eval_acc, num_train_step_per_epoch*i + index)
         
         save_path=SAVE_PATH+f'epoch-{i}/'
-        model.save_pretrained(save_path)
+        if multi_gpu:
+            model.module.save_pretrained(save_path)
+        else:
+            model.save_pretrained(save_path)
         tokenizer.save_pretrained(save_path)
-
-        eval_acc=eval(model, tokenizer)
-        print('Eval results: ', eval_acc)
-        writer.add_scalar('Eval_acc', eval_acc, i)
             

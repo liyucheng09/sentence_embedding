@@ -36,6 +36,7 @@ def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as f:
             ds=pickle.load(f)
+        print('Reusing cached dataset. Num instances: ', len(ds['label']))
         return ds['tokenized_a'], ds['tokenized_b'], ds['label']
 
     ds=load_dataset(scripts, data_path=path)[ds]
@@ -67,9 +68,12 @@ def get_vectors(model, tokenized_a, tokenized_b):
     return torch.cat(a_results), torch.cat(b_results)
 
 def to_gpu(inputs):
-    return {
-        k:v.to('cuda') for k,v in inputs.items()
-    }
+    if isinstance(inputs, dict):
+        return {
+            k:v.to('cuda') for k,v in inputs.items()
+        }
+    else:
+        return inputs.to('cuda')
 
 class SentencePairDataset(Dataset):
     def __init__(self, tokenized_a, tokenized_b, label=None):
@@ -97,7 +101,7 @@ class SentencePairDataset(Dataset):
 def get_dataloader(tokenized_a, tokenized_b, batch_size=16, label=None):
     # TODO: pin memory
     ds=SentencePairDataset(tokenized_a, tokenized_b, label=label)
-    dl = DataLoader(ds, batch_size=batch_size, shuffle=True)
+    dl = DataLoader(ds, batch_size=batch_size, shuffle=True, pin_memory=True)
 
     return dl
 
