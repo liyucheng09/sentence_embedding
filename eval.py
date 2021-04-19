@@ -5,7 +5,8 @@ from utils import (get_model_and_tokenizer,
                     get_tokenized_ds,
                     get_vectors,
                     compute_kernel_bias,
-                    transform_and_normalize)
+                    transform_and_normalize,
+                  save_kernel_and_bias)
 from sklearn.metrics import accuracy_score
 import torch
 
@@ -26,17 +27,19 @@ pool='mean'
 
 if __name__=='__main__':
 
-    ds, model_name = sys.argv[1:]
+    ds, model_name, = sys.argv[1:]
 
     model, tokenizer = get_model_and_tokenizer(model_name, cache_dir=cache_dir)
     input_a, input_b, label = get_tokenized_ds(datasets_paths[ds]['scripts'], datasets_paths[ds]['data_path'], tokenizer, ds)
 
     with torch.no_grad():
-        a_vecs, b_vecs = get_vectors(model, input_a, input_b, pool=pool)
+        a_vecs, b_vecs = get_vectors(model, input_a, input_b)
     a_vecs=a_vecs.cpu().numpy()
     b_vecs=b_vecs.cpu().numpy()
     if n_components:
         kernel, bias = compute_kernel_bias([a_vecs, b_vecs])
+        
+        save_kernel_and_bias(kernel, bias, model_name)
 
         kernel=kernel[:, :n_components]
         a_vecs=transform_and_normalize(a_vecs, kernel, bias)

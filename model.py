@@ -15,19 +15,24 @@ class SentencePairEmbedding(BertModel):
             self.sbert_linear=nn.Linear(768*3, 2)
             self.cross_entropy_loss=nn.CrossEntropyLoss()
 
-    def forward(self, texta, textb, label=None, pool='first_last_avg_pooling'):
+    def forward(self, texta, textb=None, label=None, pool='first_last_avg_pooling'):
 
         output1 = super(SentencePairEmbedding, self).forward(**texta, output_hidden_states=True)
-        output2 = super(SentencePairEmbedding, self).forward(**textb, output_hidden_states=True)
+        if textb is not None:
+            output2 = super(SentencePairEmbedding, self).forward(**textb, output_hidden_states=True)
 
         if pool=='first_last_avg_pooling':
             sentence_a_embedding=self._first_last_average_pooling(output1.hidden_states, texta['attention_mask'])
-            sentence_b_embedding=self._first_last_average_pooling(output2.hidden_states, textb['attention_mask'])
+            if textb is not None:
+                sentence_b_embedding=self._first_last_average_pooling(output2.hidden_states, textb['attention_mask'])
         elif pool=='mean':
             sentence_a_embedding=self._average_pooling(output1.hidden_states, texta['attention_mask'])
-            sentence_b_embedding=self._average_pooling(output2.hidden_states, textb['attention_mask'])
+            if textb is not None:
+                sentence_b_embedding=self._average_pooling(output2.hidden_states, textb['attention_mask'])
 
-        output=(sentence_a_embedding, sentence_b_embedding,)
+        output=(sentence_a_embedding,)
+        if textb is not None:
+            output+=(sentence_b_embedding, )
         if label is not None:
             logits=self.sbert_linear(torch.cat(
                     [sentence_a_embedding, sentence_b_embedding, torch.abs(sentence_a_embedding-sentence_b_embedding)], dim=-1

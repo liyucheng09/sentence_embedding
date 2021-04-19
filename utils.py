@@ -163,3 +163,9 @@ def eval(model, tokenizer, ds='atec', n_components=768):
         sims=(a_vecs * b_vecs).sum(axis=1)
 
     return accuracy_score(sims>0.5, label)
+
+def save_kernel_and_bias(kernel, bias, model_path):
+    np.save(os.path.join(model_path, 'kernel.npy'), kernel)
+    np.save(os.path.join(model_path, 'bias.npy'), bias)
+    
+    print(f'Kernal and bias saved in {os.path.join(model_path, "kernel.npy")} and {os.path.join(model_path, "bias.npy")}')
