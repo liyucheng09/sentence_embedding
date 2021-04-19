@@ -3,7 +3,7 @@ import torch
 import os
 import numpy as np
 
-class Demo:
+class SentenceEmbedding:
     def __init__(self, model_path, max_length=64, n_components=768, kernel_bias_path=None):
 
         self.model, self.tokenizer = get_model_and_tokenizer(model_path, cache_dir='/Users/liyucheng/projects/model_cache/')
@@ -36,5 +36,5 @@ class Demo:
 
 
 if __name__=='__main__':
-    demo=Demo('bert-base-chinese', kernel_bias_path='kernel_path/')
+    demo=SentenceEmbedding('bert-base-chinese', kernel_bias_path='kernel_path/')
     print(demo.get_embeddings(['我不知道', '我是猪']))

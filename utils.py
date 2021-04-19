@@ -55,7 +55,7 @@ def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
 
     return tokenized_a, tokenized_b, label
 
-def get_vectors(model, tokenized_a, tokenized_b, pool='first_last_avg_pooling'):
+def get_vectors(model, tokenized_a, tokenized_b=None, pool='first_last_avg_pooling'):
     ds=SentencePairDataset(tokenized_a, tokenized_b)
     dl = DataLoader(ds, batch_size=16)
     a_results=[]
@@ -63,10 +63,16 @@ def get_vectors(model, tokenized_a, tokenized_b, pool='first_last_avg_pooling'):
     for batch in tqdm(dl):
         if torch.cuda.is_available():
             batch=[to_gpu(i) for i in batch]
-        a_embedding, b_embedding = model(batch[0], batch[1], pool=pool)
+        output = model(*batch, pool=pool)
+        a_embedding = output[0]
         a_results.append(a_embedding)
-        b_results.append(b_embedding)
-    return torch.cat(a_results), torch.cat(b_results)
+        if tokenized_b is not None:
+            b_embedding=output[1]
+            b_results.append(b_embedding)
+    output=(torch.cat(a_results),)
+    if tokenized_b is not None:
+        output+=(torch.cat(b_results), )
+    return output
 
 def to_gpu(inputs):
     if isinstance(inputs, dict):
@@ -77,12 +83,10 @@ def to_gpu(inputs):
         return inputs.to('cuda')
 
 class SentencePairDataset(Dataset):
-    def __init__(self, tokenized_a, tokenized_b, label=None):
+    def __init__(self, tokenized_a, tokenized_b=None, label=None):
         self.tokenized_a=tokenized_a
         self.tokenized_b=tokenized_b
         self.label=label
-
-        assert tokenized_a['input_ids'].shape[0] == tokenized_b['input_ids'].shape[0]
 
     def __len__(self):
         return self.tokenized_a['input_ids'].shape[0]
@@ -91,10 +95,12 @@ class SentencePairDataset(Dataset):
         input_a = {
             k:v[index] for k,v in self.tokenized_a.items()
         }
-        input_b={
-            k:v[index] for k,v in self.tokenized_b.items()
-        }
-        output=(input_a, input_b, )
+        output=(input_a, )
+        if self.tokenized_b is not None:
+            input_b={
+                k:v[index] for k,v in self.tokenized_b.items()
+            }
+            output+=(input_b, )
         if self.label is not None:
             output+=(torch.LongTensor([self.label[index]]), )
         return output
