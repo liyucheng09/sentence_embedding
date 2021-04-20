@@ -32,12 +32,15 @@ def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None, is_t
         model.eval()
     return model, tokenizer
 
-def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64):
+def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64, slice=None):
     cache_path=path+'.cache'
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as f:
             ds=pickle.load(f)
         print(f'Reusing cached dataset: {cache_path}. Num instances: {len(ds["label"])}')
+
+        if slice is not None:
+            ds={k:{k1:v1[:slice] for k1, v1 in v.items()} if k!='label' else v[:slice] for k,v in ds.items()}
         return ds['tokenized_a'], ds['tokenized_b'], ds['label']
 
     ds=load_dataset(scripts, data_path=path)[ds]
