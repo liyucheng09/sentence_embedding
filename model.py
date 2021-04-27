@@ -2,6 +2,8 @@ from transformers import BertModel
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+import numpy as np
+import os
 
 class SentencePairEmbedding(BertModel):
 
@@ -70,4 +72,60 @@ class SentencePairEmbedding(BertModel):
 
         return sentence_embedding
 
+class SingleSentenceEmbedding(BertModel):
 
+    def __init__(self, config, **kwargs):
+        super(SingleSentenceEmbedding, self).__init__(config, **kwargs)
+        self._get_kernel_and_bias('kernel_path/')
+    
+    def _get_kernel_and_bias(self, kernel_bias_path):
+        self.kernel=torch.Tensor(np.load(os.path.join(kernel_bias_path, 'kernel.npy')))
+        self.bias=torch.Tensor(np.load(os.path.join(kernel_bias_path, 'bias.npy')))
+
+    def forward(self, input_ids, token_type_ids, attention_mask):
+
+        output1 = super(SingleSentenceEmbedding, self).forward(input_ids, token_type_ids)
+        sentence_a_embedding=self._first_last_average_pooling(output1[-1], attention_mask)
+        self.transform_and_normalize(sentence_a_embedding, self.kernel, self.bias)
+        return sentence_a_embedding
+    
+    def transform_and_normalize(self, vecs, kernel, bias):    
+        vecs = torch.mm((vecs + bias),kernel)
+        norms = (vecs**2).sum(dim=1, keepdims=True)**0.5
+        return vecs / torch.clip(norms, 1e-8, np.inf)
+
+    def _average_pooling(self, hidden, attention_mask):
+        last_hidden_states=hidden[-1]
+        last_hidden_states = torch.sum(
+            last_hidden_states * attention_mask.unsqueeze(-1), dim=1
+        ) / attention_mask.sum(dim=-1, keepdim=True)
+
+        return last_hidden_states
+
+
+    def _first_last_average_pooling(self, hidden, attention_mask):
+        first_hidden_states = hidden[1]
+        last_hidden_states = hidden[-1]
+
+        first_hidden_states = torch.sum(
+            first_hidden_states * attention_mask.unsqueeze(-1), dim=1
+        ) / attention_mask.sum(dim=-1, keepdim=True)
+
+        last_hidden_states = torch.sum(
+            last_hidden_states * attention_mask.unsqueeze(-1), dim=1
+        ) / attention_mask.sum(dim=-1, keepdim=True)
+
+        sentence_embedding=torch.mean(
+            torch.stack([first_hidden_states, last_hidden_states]), dim=0
+        )
+
+        return sentence_embedding
+
+
+if __name__=='__main__':
+    model=SingleSentenceEmbedding.from_pretrained('bert-base-chinese', 
+        cache_dir='/Users/liyucheng/projects/model_cache/', torchscript=True, output_hidden_states=True)
+    from transformers import BertModel, BertTokenizer
+    t=BertTokenizer.from_pretrained('bert-base-chinese', cache_dir='/Users/liyucheng/projects/model_cache/')
+    m=torch.jit.trace(model, list(t(['我是猪'], return_tensors='pt').values()))
+    print(m(*t(['我是猪','我不知道'], max_length=64, padding=True, truncation=True, return_tensors='pt').values()))
