@@ -5,3 +5,4 @@ checkpoints/*
 runs/*
 .glove_cache/
 data/
+*.zip

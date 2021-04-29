@@ -129,3 +129,5 @@ if __name__=='__main__':
     t=BertTokenizer.from_pretrained('bert-base-chinese', cache_dir='/Users/liyucheng/projects/model_cache/')
     m=torch.jit.trace(model, list(t(['我是猪'], return_tensors='pt').values()))
     print(m(*t(['我是猪','我不知道'], max_length=64, padding=True, truncation=True, return_tensors='pt').values()))
+
+    torch.jit.save(m, 'sentence-embedding.zip')
