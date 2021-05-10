@@ -75,8 +75,18 @@ class SentencePairEmbedding(BertModel):
 class SingleSentenceEmbedding(BertModel):
 
     def __init__(self, config, **kwargs):
+        self.pooling_type=kwargs.pop('pooler_type', config.pooler_type)
+        self.whitening=kwargs.pop('whitening')
+        if self.whitening:
+            self._get_kernel_and_bias('kernel_path/')
+        if self.pooling_type == 'cls_pooling':
+            self.cls_token_id=kwargs.pop('cls_token_id')
+        elif self.pooling_type == 'first_last_average_pooling':
+            kwargs=dict(kwargs, output_hidden_states=True)
         super(SingleSentenceEmbedding, self).__init__(config, **kwargs)
-        self._get_kernel_and_bias('kernel_path/')
+
+        if self.pooling_type == 'cls_pooling':
+            self.fc=nn.Linear(768, 768)
     
     def _get_kernel_and_bias(self, kernel_bias_path):
         self.kernel=torch.Tensor(np.load(os.path.join(kernel_bias_path, 'kernel.npy')))
@@ -84,9 +94,16 @@ class SingleSentenceEmbedding(BertModel):
 
     def forward(self, input_ids, token_type_ids, attention_mask):
 
-        output1 = super(SingleSentenceEmbedding, self).forward(input_ids, token_type_ids)
-        sentence_a_embedding=self._first_last_average_pooling(output1[-1], attention_mask)
-        self.transform_and_normalize(sentence_a_embedding, self.kernel, self.bias)
+        output1 = super(SingleSentenceEmbedding, self).forward(input_ids, attention_mask)
+
+        if self.pooling_type == 'first_last_average_pooling':
+            sentence_a_embedding=self.first_last_average_pooling(output1[-1], attention_mask)
+        elif self.pooling_type == 'cls_pooling':
+            sentence_a_embedding = self._cls_pooling(input_ids, output1[-1][-1], self.cls_token_id)
+
+        if self.whitening:
+            sentence_a_embedding = self.transform_and_normalize(sentence_a_embedding, self.kernel, self.bias)
+
         return sentence_a_embedding
     
     def transform_and_normalize(self, vecs, kernel, bias):    
@@ -102,6 +119,8 @@ class SingleSentenceEmbedding(BertModel):
 
         return last_hidden_states
 
+    def _cls_pooling(self, ids, last_hidden, cls_token=0):
+        return last_hidden[ids==cls_token]
 
     def _first_last_average_pooling(self, hidden, attention_mask):
         first_hidden_states = hidden[1]

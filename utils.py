@@ -32,7 +32,9 @@ def get_model_and_tokenizer(model_name='bert-base-chinese', cache_dir=None, is_t
         model.eval()
     return model, tokenizer
 
-def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64, slice=None):
+def get_tokenized_ds(tokenizer, ds, max_length=64, slice=None):
+    path=datasets_paths[ds]['data_path']
+    scripts=datasets_paths[ds]['scripts']
     cache_path=path+'.cache'
     if os.path.exists(cache_path):
         with open(cache_path, 'rb') as f:
@@ -108,13 +110,10 @@ class SentencePairDataset(Dataset):
             output+=(torch.LongTensor([self.label[index]]), )
         return output
 
-def get_dataloader(tokenized_a, tokenized_b, batch_size=16, label=None):
-    # TODO: pin memory
+def get_dataloader(tokenized_a, tokenized_b=None, batch_size=16, label=None):
     ds=SentencePairDataset(tokenized_a, tokenized_b, label=label)
     dl = DataLoader(ds, batch_size=batch_size, shuffle=True, pin_memory=True)
-
     return dl
-
         
 def compute_kernel_bias(vecs):
     vecs=np.concatenate(vecs)
@@ -129,18 +128,14 @@ def transform_and_normalize(vecs, kernel, bias):
     norms = (vecs**2).sum(axis=1, keepdims=True)**0.5
     return vecs / np.clip(norms, 1e-8, np.inf)
 
-def get_optimizer_and_schedule(model, num_training_steps, num_warmup_steps=3000):
-    optimizer=AdamW(
-        [
-            {
-                'params': [param for name, param in model.named_parameters() if 'sbert' not in name], 'lr': 5e-5
+def get_optimizer_and_schedule(model, num_training_steps=None, num_warmup_steps=3000):
+    # params=[{'params': [param for name, param in model.named_parameters() if 'sbert' not in name], 'lr': 5e-5},
+    # {'params': [param for name, param in model.named_parameters() if 'sbert' in name], 'lr': 1e-3}]
+    
+    optimizer=AdamW(model.parameters())
 
-            },
-            {
-                'params': [param for name, param in model.named_parameters() if 'sbert' in name], 'lr': 1e-3
-            }
-        ]
-    )
+    if num_training_steps is None:
+        return optimizer
 
     def lr_lambda(current_step: int):
         if current_step < num_warmup_steps:

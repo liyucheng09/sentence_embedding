@@ -6,3 +6,4 @@ runs/*
 .glove_cache/
 data/
 *.zip
+logs/*
