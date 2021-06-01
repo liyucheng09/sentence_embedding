@@ -27,6 +27,7 @@ datasets_paths={
 n_components=768
 pool='mean'
 cache_embedding='checkpoints/.cache/'
+kernel_path='kernel_path/'
 
 if __name__=='__main__':
 

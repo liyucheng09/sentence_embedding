@@ -131,3 +131,13 @@ if __name__=='__main__':
     print(m(*t(['我是猪','我不知道'], max_length=64, padding=True, truncation=True, return_tensors='pt').values()))
 
     m.save('/cfs/cfs-dtmr08t1/sentence-embedding.zip')
+# =======
+#     model=SingleSentenceEmbedding.from_pretrained('bert-base-chinese', 
+#         cache_dir='/Users/liyucheng/projects/model_cache/', torchscript=True, output_hidden_states=True)
+#     from transformers import BertModel, BertTokenizer
+#     t=BertTokenizer.from_pretrained('bert-base-chinese', cache_dir='/Users/liyucheng/projects/model_cache/')
+#     m=torch.jit.trace(model, list(t(['我是猪'], return_tensors='pt').values()))
+#     print(m(*t(['我是猪','我不知道'], max_length=64, padding=True, truncation=True, return_tensors='pt').values()))
+
+#     torch.jit.save(m, 'sentence-embedding.zip')
+# >>>>>>> 812aa8f5c590cd5b8709a88955865fe20771f332
