@@ -20,15 +20,15 @@ class SentenceEmbedding:
         self._get_kernel_and_bias(model_path, kernel_bias_path, corpus_for_kernel_computing)
         self.n_components=n_components
     
-    def get_embeddings(self, sents, n_components=self.n_components):
+    def get_embeddings(self, sents, whitening=True):
         tokenized_sents=self.tokenizer(sents, max_length=self.max_length, padding=True, truncation=True, return_tensors='pt')
         with torch.no_grad():
             vecs=get_vectors(self.model, tokenized_sents)[0]
         vecs=vecs.cpu().numpy()
 
-        if n_components:
+        if whitening:
             kernel, bias = self.kernel, self.bias
-            kernel=kernel[:, :n_components]
+            kernel=kernel[:, :self.n_components]
             vecs=transform_and_normalize(vecs, kernel, bias)
 
         return vecs
@@ -48,7 +48,7 @@ class SentenceEmbedding:
     def _computing_kernel_and_save(self, kernel_bias_path, corpus_for_kernel_computing):
         with open(corpus_for_kernel_computing, encoding='utf-8') as f:
             sents=f.readlines()
-        vecs=self.get_embeddings(sents, n_components=None)
+        vecs=self.get_embeddings(sents, whitening=False)
         kernel, bias = compute_kernel_bias([vecs])
         save_kernel_and_bias(kernel, bias, kernel_bias_path)
 
