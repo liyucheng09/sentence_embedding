@@ -3,37 +3,24 @@ from lyc.utils import vector_l2_normlize
 import sys
 import pandas as pd
 from demo import SentenceEmbedding
+from utils import StandardQuery
+from sklearn.metrics import accuracy_score
 
-class StandardQuery:
-
-    def __init__(self, st_query, sim_querys=None):
-        self.st_query = st_query
-        self.sim_querys = sim_querys
-    
-    def vectorizing(self, func):
-        self.st_emb = vector_l2_normlize(func([self.st_query]))
-        if self.sim_querys is not None:
-            self.sim_embs = vector_l2_normlize(func(self.sim_querys))
-    
-    def sims(self, input_vec):
-        if self.sim_querys is not None:
-            embs=np.concatenate([self.st_emb, self.sim_embs])
-        else:
-            embs=self.st_emb
-        sims = np.dot(embs, input_vec)
-        choosen_one = np.argmax(sims)
-        self.maximum_sim = sims[choosen_one]
-
-def matching(input_query, st_querys, vectorizing_func, threshold=0.2):
+def matching(input_query, st_querys, vectorizing_func, threshold=0.5, recall=None, topk=1):
     input_emb = vectorizing_func([input_query])[0]
     for st_query in st_querys:
         st_query.sims(input_emb)
     st_querys.sort(key=lambda x:x.maximum_sim, reverse=True)
-    choosen_one = st_querys[0]
-    if choosen_one.maximum_sim>threshold:
-        return choosen_one.st_query
-    else:
+
+    if threshold is not None:
+        st_querys = [query.st_query for query in st_querys if query.maximum_sim>threshold]
+    
+    if len(st_querys)==0:
         return None
+    elif len(st_querys)<topk:
+        return st_querys
+    else:
+        return st_querys[:topk] if topk!=1 else st_querys[0]
 
 if __name__=='__main__':
 
@@ -48,13 +35,18 @@ if __name__=='__main__':
         st_query = StandardQuery(st_query_, sim_query)
         st_querys.append(st_query)
     
-    model = SentenceEmbedding(model_path, kernel_bias_path='yezi_kernel_path/')
+
+    model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='cls')
     for st_query in st_querys:
         st_query.vectorizing(model.get_embeddings)
     
     test_set=pd.read_csv(test_set)
 
     answers = test_set['query'].apply(matching, args=(st_querys, model.get_embeddings))
-    print(answers)
-    test_set['matching_answer']=answers
-    test_set.to_csv('matching_results_02.csv', index=False)
+
+    df=pd.DataFrame({'query':test_set['query'], 'matching':answers})
+    test_set['answer']=answers
+    # df.to_csv('matching_results.csv', index=False)
+    df2=test_set.fillna('-')
+    acc=accuracy_score(df2['ground_true'], df2['answer'])
+    print(acc)

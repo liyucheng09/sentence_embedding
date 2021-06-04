@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 class SentenceEmbedding:
-    def __init__(self, model_path, max_length=64, n_components=768, kernel_bias_path=None, corpus_for_kernel_computing=None):
+    def __init__(self, model_path, max_length=64, n_components=768, kernel_bias_path=None, corpus_for_kernel_computing=None, pool='first_last_avg_pooling'):
         """[summary]
 
         Args:
@@ -18,11 +18,12 @@ class SentenceEmbedding:
         self.max_length=max_length
         self._get_kernel_and_bias(model_path, kernel_bias_path, corpus_for_kernel_computing)
         self.n_components=n_components
+        self.pool=pool
     
     def get_embeddings(self, sents, whitening=True):
         tokenized_sents=self.tokenizer(sents, max_length=self.max_length, padding=True, truncation=True, return_tensors='pt')
         with torch.no_grad():
-            vecs=get_vectors(self.model, tokenized_sents)[0]
+            vecs=get_vectors(self.model, tokenized_sents, pool=self.pool)[0]
         vecs=vecs.cpu().numpy()
 
         if whitening:
