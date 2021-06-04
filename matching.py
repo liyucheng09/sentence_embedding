@@ -2,7 +2,7 @@ import numpy as np
 from lyc.utils import vector_l2_normlize
 import sys
 import pandas as pd
-from demo import SentenceEmbedding
+from demo import SentenceEmbedding, SimCSEPipeline
 from utils import StandardQuery
 from sklearn.metrics import accuracy_score
 
@@ -35,8 +35,8 @@ if __name__=='__main__':
         st_query = StandardQuery(st_query_, sim_query)
         st_querys.append(st_query)
     
-
-    model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/')
+    # model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='cls')
+    model = SimCSEPipeline(model_path, model_path)
     for st_query in st_querys:
         st_query.vectorizing(model.get_embeddings)
     
