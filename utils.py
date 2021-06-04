@@ -1,6 +1,6 @@
 from transformers import BertModel, BertTokenizer
 from datasets import load_dataset
-from torch.utils.data import DataLoader, TensorDataset, Dataset
+from torch.utils.data import DataLoader, TensorDataset, Dataset, IterableDataset
 from tqdm import tqdm
 from model import SentencePairEmbedding
 import numpy as np
@@ -10,6 +10,10 @@ from torch.optim.lr_scheduler import LambdaLR
 from sklearn.metrics import accuracy_score
 import os
 import pickle
+import pandas as pd
+import random
+from lyc.utils import vector_l2_normlize
+import math
 
 datasets_paths={
     'atec': {
@@ -178,3 +182,106 @@ def save_kernel_and_bias(kernel, bias, model_path):
     np.save(os.path.join(model_path, 'bias.npy'), bias)
     
     print(f'Kernal and bias saved in {os.path.join(model_path, "kernel.npy")} and {os.path.join(model_path, "bias.npy")}')
+
+class StandardQuery:
+
+    def __init__(self, st_query, sim_querys=None):
+        self.st_query = st_query
+        self.sim_querys = sim_querys
+        self.all_querys=[self.st_query]+self.sim_querys if self.sim_querys is not None else [self.st_query]
+    
+    def vectorizing(self, func):
+        self.st_emb = vector_l2_normlize(func([self.st_query]))
+        if self.sim_querys is not None:
+            self.sim_embs = vector_l2_normlize(func(self.sim_querys))
+    
+    def sims(self, input_vec):
+        if self.sim_querys is not None:
+            embs=np.concatenate([self.st_emb, self.sim_embs])
+        else:
+            embs=self.st_emb
+        sims = np.dot(embs, input_vec)
+        choosen_one = np.argmax(sims)
+        self.maximum_sim = sims[choosen_one]
+    
+    def random_return_a_instance(self):
+        return random.choice(self.all_querys)
+
+class SimCSEDSForYEZI(IterableDataset):
+
+    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=64):
+        faq_table = pd.read_excel(faq_table, usecols='A,B', header=None)
+
+        self.st_querys=[]
+        for index, line in faq_table.iterrows():
+            st_query_ = line[0]
+            sim_query = line[1].split('##') if not isinstance(line[1], float) else None
+            st_query = StandardQuery(st_query_, sim_query)
+            self.st_querys.append(st_query)
+        
+        self.tokenizer=tokenizer
+        self.st_querys=pd.Series(self.st_querys)
+        self.steps = steps
+        self.batch_size=batch_size
+        self.max_length=max_length
+    
+    def __iter__(self):
+        count=0
+        while count<self.steps:
+            selected=self.st_querys.sample(self.batch_size)
+            selected=[query.random_return_a_instance() for query in selected]
+            # print(selected)
+            encoding=self.tokenizer(selected, return_tensors='pt', max_length=self.max_length, padding=True, truncation=True)
+            encoding={k:v.repeat(2,1) for k,v in encoding.items()}
+
+            idx1=torch.arange(self.batch_size*2)[None, :]
+            idx2=(idx1.T+self.batch_size)%(self.batch_size*2)
+            label = torch.LongTensor(idx2).squeeze(-1)
+            yield {**encoding, 'labels': label}
+            count+=1
+
+    def __len__(self):
+        return self.steps
+
+class SimCSEEvalDSForYEZI(IterableDataset):
+
+    def __init__(self, test_table, tokenizer, batch_size=32, max_length=64):
+        test_table = pd.read_csv(test_table)
+        self.test_table = test_table[test_table['query_quality']==2]
+        
+        self.tokenizer=tokenizer
+        self.batch_size=batch_size
+        self.max_length=max_length
+    
+    def __iter__(self):
+        count=0
+        while count<len(self.test_table.index):
+            querys=self.test_table['query'][count:count+self.batch_size].tolist()
+            ground_trues=self.test_table['ground_true'][count:count+self.batch_size].tolist()
+
+            encoding=self.tokenizer(querys+ground_trues, return_tensors='pt', max_length=self.max_length, padding=True, truncation=True)
+            label = torch.ones(min(self.batch_size, len(querys)), dtype=torch.int)
+            yield {**encoding, 'labels': label}
+            count+=self.batch_size
+    
+    def __len__(self):
+        return math.ceil(len(self.test_table.index) / self.batch_size)
+
+def SimCSEEval(model, dl, threshold=0.5):
+    all_preds = []
+    all_labels = []
+    for batch in tqdm(dl):
+        labels = batch.pop('labels')
+        all_labels.extend(labels.numpy()[0])
+
+        batch = {k:v.to(model.device) for k,v in batch.items()}
+        embs = model(**batch)[0]
+        embs=embs.detach().numpy()
+        embs = vector_l2_normlize(embs)
+        embs_a, embs_b = np.split(embs, 2)
+        sims = np.dot(embs_a, embs_b.T)
+        sims = np.diag(sims)
+        all_preds.extend(sims>threshold)
+    acc=accuracy_score(all_labels, all_preds)
+    print('------ACC: ', acc)
+    return {'ACC' : acc}
