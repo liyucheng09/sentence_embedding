@@ -36,7 +36,7 @@ if __name__=='__main__':
         st_querys.append(st_query)
     
 
-    model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='cls')
+    model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/')
     for st_query in st_querys:
         st_query.vectorizing(model.get_embeddings)
     
