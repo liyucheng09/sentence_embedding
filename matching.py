@@ -7,7 +7,7 @@ from utils import StandardQuery
 from sklearn.metrics import accuracy_score
 
 def matching(input_query, st_querys, vectorizing_func, threshold=0.5, recall=None, topk=1):
-    input_emb = vectorizing_func([input_query])[0]
+    input_emb = vectorizing_func([input_query], True)[0]
     for st_query in st_querys:
         st_query.sims(input_emb)
     st_querys.sort(key=lambda x:x.maximum_sim, reverse=True)
@@ -25,7 +25,8 @@ def matching(input_query, st_querys, vectorizing_func, threshold=0.5, recall=Non
 if __name__=='__main__':
 
     faq_table, test_set = sys.argv[1:]
-    model_path='../Qsumm/bert-base-chinese-local'
+#     model_path='../Qsumm/bert-base-chinese-local'
+    model_path='checkpoints/simcse3/checkpoint-5500/'
     faq_table = pd.read_excel(faq_table, usecols='A,B', header=None)
 
     st_querys=[]
@@ -35,8 +36,8 @@ if __name__=='__main__':
         st_query = StandardQuery(st_query_, sim_query)
         st_querys.append(st_query)
     
-    # model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='cls')
-    model = SimCSEPipeline(model_path, model_path)
+    model = SentenceEmbedding(model_path, kernel_bias_path='yezi_kernel_path/', pool='cls')
+#     model = SimCSEPipeline(model_path, model_path)
     for st_query in st_querys:
         st_query.vectorizing(model.get_embeddings)
     

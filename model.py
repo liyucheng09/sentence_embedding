@@ -126,9 +126,50 @@ class SingleSentenceEmbedding(BertModel):
 
         return sentence_embedding
 
+class Sentence(BertModel):
+
+    def forward(self,  input_ids, attention_mask, token_type_ids, labels=None, pool='first_last_avg_pooling'):
+
+        output1 = super().forward(input_ids, attention_mask, token_type_ids, output_hidden_states=True)
+
+        if pool=='first_last_avg_pooling':
+            sentence_a_embedding=self._first_last_average_pooling(output1.hidden_states, attention_mask)
+        elif pool=='mean':
+            sentence_a_embedding=self._average_pooling(output1.hidden_states, attention_mask)
+        elif pool=='cls':
+            sentence_a_embedding=output1.last_hidden_state[:,0]
+
+        output=(sentence_a_embedding,)
+        return output
+
+    def _average_pooling(self, hidden, attention_mask):
+        last_hidden_states=hidden[-1]
+        last_hidden_states = torch.sum(
+            last_hidden_states * attention_mask.unsqueeze(-1), dim=1
+        ) / attention_mask.sum(dim=-1, keepdim=True)
+
+        return last_hidden_states
+
+
+    def _first_last_average_pooling(self, hidden, attention_mask):
+        first_hidden_states = hidden[1]
+        last_hidden_states = hidden[-1]
+
+        first_hidden_states = torch.sum(
+            first_hidden_states * attention_mask.unsqueeze(-1), dim=1
+        ) / attention_mask.sum(dim=-1, keepdim=True)
+
+        last_hidden_states = torch.sum(
+            last_hidden_states * attention_mask.unsqueeze(-1), dim=1
+        ) / attention_mask.sum(dim=-1, keepdim=True)
+
+        sentence_embedding=torch.mean(
+            torch.stack([first_hidden_states, last_hidden_states]), dim=0
+        )
+
+        return sentence_embedding
+    
 class SimCSE(BertModel):
-    def __init__(self, *args):
-        super().__init__(*args)
     
     def forward(self, input_ids, attention_mask, token_type_ids, labels=None, **kwargs):
         if input_ids.shape[0]==1 and len(input_ids.shape)==3:
@@ -139,7 +180,7 @@ class SimCSE(BertModel):
             return (embs,)
         embs=vector_l2_normlize(embs)
         sims=torch.matmul(embs, embs.T)
-        sims=sims*20 - torch.eye(embs.shape[0])*1e12
+        sims=sims*20 - torch.eye(embs.shape[0]).to(self.device)*1e12
 
         loss=F.cross_entropy(sims, labels)
         return (loss, embs, )

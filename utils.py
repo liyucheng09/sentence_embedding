@@ -64,7 +64,7 @@ def get_tokenized_ds(scripts, path, tokenizer, ds, max_length=64, slice=None):
 
 def get_vectors(model, tokenized_a, tokenized_b=None, pool='first_last_avg_pooling'):
     ds=SentencePairDataset(tokenized_a, tokenized_b)
-    dl = DataLoader(ds, batch_size=16)
+    dl = DataLoader(ds, batch_size=32)
     a_results=[]
     b_results=[]
     for batch in tqdm(dl, desc="Vectorizing:"):
@@ -192,9 +192,9 @@ class StandardQuery:
         self.all_querys=[self.st_query]+self.sim_querys if self.sim_querys is not None else [self.st_query]
     
     def vectorizing(self, func):
-        self.st_emb = vector_l2_normlize(func([self.st_query]))
+        self.st_emb = vector_l2_normlize(func([self.st_query], True))
         if self.sim_querys is not None:
-            self.sim_embs = vector_l2_normlize(func(self.sim_querys))
+            self.sim_embs = vector_l2_normlize(func(self.sim_querys, True))
     
     def sims(self, input_vec):
         if self.sim_querys is not None:
@@ -210,8 +210,8 @@ class StandardQuery:
 
 class SimCSEDSForYEZI(IterableDataset):
 
-    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=64):
-        faq_table = pd.read_excel(faq_table, usecols='A,B', header=None)
+    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=64, repeat=True):
+        faq_table = pd.read_excel(faq_table, usecols='A,B', header=0)
 
         self.st_querys=[]
         for index, line in faq_table.iterrows():
@@ -225,15 +225,21 @@ class SimCSEDSForYEZI(IterableDataset):
         self.steps = steps
         self.batch_size=batch_size
         self.max_length=max_length
+        self.repeat=repeat
     
     def __iter__(self):
         count=0
         while count<self.steps:
-            selected=self.st_querys.sample(self.batch_size)
-            selected=[query.random_return_a_instance() for query in selected]
-            # print(selected)
-            encoding=self.tokenizer(selected, return_tensors='pt', max_length=self.max_length, padding=True, truncation=True)
-            encoding={k:v.repeat(2,1) for k,v in encoding.items()}
+            selected=self.st_querys.sample(self.batch_size, weights=self.st_querys.apply(lambda x:len(x.sim_querys)+1 if x.sim_querys is not None else 1))
+            if self.repeat:
+                selected=[query.random_return_a_instance() for query in selected]
+                # print(selected)
+                encoding=self.tokenizer(selected, return_tensors='pt', max_length=self.max_length, padding=True, truncation=True)
+                encoding={k:v.repeat(2,1) for k,v in encoding.items()}
+            else:
+                selected1=[query.random_return_a_instance() for query in selected]
+                selected2=[query.random_return_a_instance() for query in selected]
+                encoding=self.tokenizer(selected1+selected2, return_tensors='pt', max_length=self.max_length, padding=True, truncation=True)
 
             idx1=torch.arange(self.batch_size*2)[None, :]
             idx2=(idx1.T+self.batch_size)%(self.batch_size*2)

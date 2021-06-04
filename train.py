@@ -13,24 +13,27 @@ if __name__ == '__main__':
     model_path, tokenizer_path, faq_table, test_table = sys.argv[1:]
 
     args=get_base_hf_args(
-        output_dir='checkpoints/simcse',
+        output_dir='checkpoints/simcse4',
         train_batch_size=1,
         epochs=1,
         lr=1e-5,
-        max_steps=1
+        save_steps=500,
+        save_strategy='steps'
     )
     
     tokenizer = get_tokenizer(tokenizer_path, is_zh=True)
-    ds = SimCSEDSForYEZI(faq_table, tokenizer)
-    eval_ds = SimCSEEvalDSForYEZI(test_table, tokenizer)
+    ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=8000, repeat=False)
+#     eval_ds = SimCSEEvalDSForYEZI(test_table, tokenizer)
 
     model=get_model(SimCSE, model_path, cache_dir='../model_cache')
-    optimizer=get_optimizer_and_schedule(model.parameters(), lr=1e-5)
+#     optimizer=get_optimizer_and_schedule(model.parameters(), lr=1e-5)
 
     trainer=HfTrainer(
         model=model,
         args=args,
         train_dataset=ds,
+        tokenizer=tokenizer
     )
-    # trainer.train()
-    SimCSEEval(trainer.model, DataLoader(eval_ds))
+    trainer.train()
+    trainer.save_model()
+#     SimCSEEval(trainer.model, DataLoader(eval_ds))
