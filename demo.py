@@ -14,7 +14,7 @@ class SentenceEmbedding:
             kernel_bias_path ([type], optional): [description]. Defaults to None.
             corpus_for_kernel_computing ([type], optional): 训练kernel和bias需要的语料，纯txt，一行一个句子. Defaults to None.
         """
-        self.model, self.tokenizer = get_model_and_tokenizer(model_path, cache_dir='/Users/liyucheng/projects/model_cache/')
+        self.model, self.tokenizer = get_model_and_tokenizer(model_path)
         self.max_length=max_length
         self._get_kernel_and_bias(model_path, kernel_bias_path, corpus_for_kernel_computing)
         self.n_components=n_components

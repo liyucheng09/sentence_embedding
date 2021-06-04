@@ -63,7 +63,7 @@ def get_vectors(model, tokenized_a, tokenized_b=None, pool='first_last_avg_pooli
     dl = DataLoader(ds, batch_size=16)
     a_results=[]
     b_results=[]
-    for batch in tqdm(dl):
+    for batch in tqdm(dl, desc="Vectorizing:"):
         if torch.cuda.is_available():
             batch=[to_gpu(i) for i in batch]
         output = model(*batch, pool=pool)

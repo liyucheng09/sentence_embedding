@@ -24,7 +24,7 @@ class StandardQuery:
         choosen_one = np.argmax(sims)
         self.maximum_sim = sims[choosen_one]
 
-def matching(input_query, st_querys, vectorizing_func, threshold=0.5):
+def matching(input_query, st_querys, vectorizing_func, threshold=0.2):
     input_emb = vectorizing_func([input_query])[0]
     for st_query in st_querys:
         st_query.sims(input_emb)
@@ -38,7 +38,7 @@ def matching(input_query, st_querys, vectorizing_func, threshold=0.5):
 if __name__=='__main__':
 
     faq_table, test_set = sys.argv[1:]
-    model_path='bert-base-chinese'
+    model_path='../Qsumm/bert-base-chinese-local'
     faq_table = pd.read_excel(faq_table, usecols='A,B', header=None)
 
     st_querys=[]
@@ -48,13 +48,13 @@ if __name__=='__main__':
         st_query = StandardQuery(st_query_, sim_query)
         st_querys.append(st_query)
     
-    model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/')
+    model = SentenceEmbedding(model_path, kernel_bias_path='yezi_kernel_path/')
     for st_query in st_querys:
         st_query.vectorizing(model.get_embeddings)
     
     test_set=pd.read_csv(test_set)
 
-    answers = test_set.head()['query'].apply(matching, args=(st_querys, model.get_embeddings))
-    df=pd.DataFrame({'query':test_set['query'], 'matching':answers})
-    df.to_csv('matching_results.csv', index=False)
-    print(df)
+    answers = test_set['query'].apply(matching, args=(st_querys, model.get_embeddings))
+    print(answers)
+    test_set['matching_answer']=answers
+    test_set.to_csv('matching_results_02.csv', index=False)
