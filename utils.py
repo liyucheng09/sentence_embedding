@@ -70,7 +70,8 @@ def get_vectors(model, tokenized_a, tokenized_b=None, pool='first_last_avg_pooli
     for batch in tqdm(dl):
         if torch.cuda.is_available():
             batch=[to_gpu(i) for i in batch]
-        output = model(*batch, pool=pool)
+        intput_a = batch[0]
+        output = model(**intput_a, pool=pool)
         a_embedding = output[0]
         a_results.append(a_embedding)
         if tokenized_b is not None:

@@ -130,7 +130,7 @@ class SimCSE(BertModel):
     def __init__(self, *args):
         super().__init__(*args)
     
-    def forward(self, input_ids, attention_mask, token_type_ids, labels=None):
+    def forward(self, input_ids, attention_mask, token_type_ids, labels=None, **kwargs):
         if input_ids.shape[0]==1 and len(input_ids.shape)==3:
             input_ids, attention_mask, token_type_ids, labels = [i.squeeze(0) if i is not None else None for i in [input_ids, attention_mask, token_type_ids, labels]]
         output=super().forward(input_ids, attention_mask, token_type_ids)
