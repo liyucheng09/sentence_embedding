@@ -250,6 +250,45 @@ class SimCSEDSForYEZI(IterableDataset):
     def __len__(self):
         return self.steps
 
+class RerankDSForYEZITrain(IterableDataset):
+
+    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=128):
+        faq_table = pd.read_excel(faq_table, usecols='A,B', header=0)
+
+        self.st_querys=[]
+        for index, line in faq_table.iterrows():
+            st_query_ = line[0]
+            sim_query = line[1].split('##') if not isinstance(line[1], float) else None
+            st_query = StandardQuery(st_query_, sim_query)
+            self.st_querys.append(st_query)
+        
+        self.tokenizer=tokenizer
+        self.st_querys=pd.Series(self.st_querys)
+        self.steps = steps
+        self.batch_size=batch_size
+        self.max_length=max_length
+    
+    def _shift(self, l):
+        return l[1:]+[l[0]]
+    
+    def __iter__(self):
+        count=0
+        while count<self.steps:
+            selected=self.st_querys.sample(self.batch_size, weights=self.st_querys.apply(lambda x:len(x.sim_querys)+1 if x.sim_querys is not None else 1))
+
+            selected1=[query.random_return_a_instance() for query in selected]
+            selected2=[query.random_return_a_instance() for query in selected]
+            positive = [[a,b] for a,b in zip(selected1, selected2)]
+            negative = [[a,b] for a,b in zip(selected1, self._shift(selected2))]
+            encoding=self.tokenizer(positive+negative, return_tensors='pt', max_length=self.max_length, padding=True, truncation=True)
+
+            label = torch.LongTensor([1]*self.batch_size+[0]*self.batch_size)
+            yield {**encoding, 'labels': label}
+            count+=1
+
+    def __len__(self):
+        return self.steps
+
 class SimCSEEvalDSForYEZI(IterableDataset):
 
     def __init__(self, test_table, tokenizer, batch_size=32, max_length=64):
