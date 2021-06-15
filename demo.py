@@ -7,7 +7,7 @@ from model import SimCSE, Sentence
 import torch
 import os
 import numpy as np
-from lyc.utils import get_model, get_tokenizer
+from lyc.utils import get_model, get_tokenizer, vector_l2_normlize
 
 class SentenceEmbedding:
     def __init__(self, model_path, max_length=64, n_components=768, kernel_bias_path=None, corpus_for_kernel_computing=None, pool='first_last_avg_pooling'):
@@ -37,7 +37,8 @@ class SentenceEmbedding:
             kernel, bias = self.kernel, self.bias
             kernel=kernel[:, :self.n_components]
             vecs=transform_and_normalize(vecs, kernel, bias)
-
+            return vecs
+        vecs=vector_l2_normlize(vecs)
         return vecs
     
     def _get_kernel_and_bias(self, model_path, kernel_bias_path, corpus_for_kernel_computing):

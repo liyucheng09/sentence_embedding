@@ -3,6 +3,7 @@ import json
 import numpy as np
 from demo import SentenceEmbedding, SimCSEPipeline
 import sys
+from lyc.utils import vector_l2_normlize
 
 class OneRun:
     def __init__(self, query, value):
@@ -27,8 +28,8 @@ class OneRun:
     def match(self):
         recall_embs=np.stack(self.recall_embs)
         sims=np.dot(recall_embs, self.query_emb)
-        args=sims[::-1].argsort()
-        self.match_results=[(self.recall[arg], sims[arg]) for arg in args]
+        args=np.flip(sims.argsort())
+        self.match_results=[(self.recall[arg], str(sims[arg])) for arg in args]
         return self.match_results
     
     def in_topk(self, topk):
@@ -51,33 +52,40 @@ class EvalSession:
     
     def _vectorizing(self, func):
         self.sent2vec={}
-        all_embs=func(self.all_sents)
+        all_embs=func(self.all_sents, True)
         for idx, sent in enumerate(self.all_sents):
-            self.sent2vec[self.all_sents[idx]]=all_embs[idx]
+            self.sent2vec[sent]=all_embs[idx]
     
     def get_topk(self, topk):
         for run in self.runs:
             r = run.match()[:topk]
             setattr(run, 'top'+str(topk), r)
     
-    def output(self, attrs, file):
+    def output(self, attrs, file, extra:dict=None, only_negative=False):
         output={}
+        if extra is not None:
+            output.update(extra)
         with open(file, 'w', encoding='utf-8') as f:
             for run in self.runs:
+                if only_negative and run.in_topk(topk):
+                    continue
                 output[run.query]=run.output(attrs)
-            json.dump(output, f)
+#             print(output)
+            json.dump(output, f, ensure_ascii=False, indent=2)
         
-    def acc(self):
-        self.get_topk(1)
-        positive = np.array([run.in_topk(1) for run in self.runs])
-        return positive/len(self.runs)
+    def acc(self, topk=1):
+        self.get_topk(topk)
+        positive = np.array([run.in_topk(topk) for run in self.runs])
+        return positive.sum()/len(self.runs)
 
 if __name__ == '__main__':
 
-    recall_json, = sys.argv[1:]
+    recall_json, topk, = sys.argv[1:]
 
-    model_path='checkpoints/simcse3/checkpoint-5500/'
-    model = SentenceEmbedding(model_path, kernel_bias_path='yezi_kernel_path/', pool='cls')
+    model_path='../Qsumm/bert-base-chinese-local'
+    model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='first_last_avg_pooling')
 
     eval=EvalSession(recall_json, model.get_embeddings)
-    print('ACC: ', eval.acc())
+    acc=eval.acc(int(topk))
+    print('ACC: ', acc)
+#     eval.output(['top'+topk], f'top{topk}_after_recall.json', extra={'ACC':acc}, only_negative=True)

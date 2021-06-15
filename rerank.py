@@ -12,10 +12,11 @@ if __name__ == '__main__':
     args = get_base_hf_args(
         output_dir='checkpoints/rerank/',
         train_batch_size=1,
-        epochs=3,
+        epochs=10,
         lr=5e-5,
         save_steps=500,
-        save_strategy='steps'
+        save_strategy='steps',
+        save_total_limit=10
     )
 
     tokenizer=get_tokenizer(tokenizer_path, is_zh=True)
@@ -29,5 +30,5 @@ if __name__ == '__main__':
         tokenizer=tokenizer
     )
 
-    trainer.train()
+    trainer.train(resume_from_checkpoint='checkpoints/rerank/checkpoint-6000')
     trainer.save_model()

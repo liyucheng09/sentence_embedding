@@ -10,19 +10,20 @@ from lyc.eval import SimCSEEvalAccComputing
 EPOCHES=1
 
 if __name__ == '__main__':
-    model_path, tokenizer_path, faq_table, test_table = sys.argv[1:]
+    model_path, tokenizer_path, faq_table, = sys.argv[1:]
 
     args=get_base_hf_args(
-        output_dir='checkpoints/simcse4',
+        output_dir='checkpoints/simcse5',
         train_batch_size=1,
         epochs=1,
         lr=1e-5,
         save_steps=500,
-        save_strategy='steps'
+        save_strategy='steps',
+        save_total_limit=10
     )
     
     tokenizer = get_tokenizer(tokenizer_path, is_zh=True)
-    ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=8000, repeat=False)
+    ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=4000, repeat=False, csv=True)
 #     eval_ds = SimCSEEvalDSForYEZI(test_table, tokenizer)
 
     model=get_model(SimCSE, model_path, cache_dir='../model_cache')

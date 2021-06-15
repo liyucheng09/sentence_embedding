@@ -1,4 +1,4 @@
-from transformers import BertModel
+from transformers import BertModel, BertForSequenceClassification
 import torch
 import torch.nn.functional as F
 import torch.nn as nn

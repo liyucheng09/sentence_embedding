@@ -212,8 +212,11 @@ class StandardQuery:
 
 class SimCSEDSForYEZI(IterableDataset):
 
-    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=64, repeat=True):
-        faq_table = pd.read_excel(faq_table, usecols='A,B', header=0)
+    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=64, repeat=True, csv=False):
+        if csv:
+            faq_table = pd.read_csv(faq_table, header=0)
+        else:
+            faq_table = pd.read_excel(faq_table, usecols='A,B', header=0)
 
         self.st_querys=[]
         for index, line in faq_table.iterrows():
