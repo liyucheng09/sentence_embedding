@@ -185,6 +185,12 @@ class SimCSE(BertModel):
         loss=F.cross_entropy(sims, labels)
         return (loss, embs, )
 
+class rerank(BertForSequenceClassification):
+    def forward(self, input_ids, attention_mask, token_type_ids, labels=None, **kwargs):
+        if input_ids.shape[0]==1 and len(input_ids.shape)==3:
+            input_ids, attention_mask, token_type_ids, labels = [i.squeeze(0) if i is not None else None for i in [input_ids, attention_mask, token_type_ids, labels]]
+        output = super().forward(input_ids, attention_mask, token_type_ids, labels=labels, **kwargs)
+        return output
 
 if __name__=='__main__':
     model=SingleSentenceEmbedding.from_pretrained('../Qsumm/bert-base-chinese-local', torchscript=True, output_hidden_states=True)
