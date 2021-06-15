@@ -212,7 +212,7 @@ class StandardQuery:
 
 class SimCSEDSForYEZI(IterableDataset):
 
-    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=64, repeat=True, csv=False):
+    def __init__(self, faq_table, tokenizer, batch_size=32, steps=1000, max_length=64, repeat=True, csv=False, excludes=None):
         if csv:
             faq_table = pd.read_csv(faq_table, header=0)
         else:
@@ -224,6 +224,9 @@ class SimCSEDSForYEZI(IterableDataset):
             sim_query = line[1].split('##') if not isinstance(line[1], float) else None
             st_query = StandardQuery(st_query_, sim_query)
             self.st_querys.append(st_query)
+        
+        if excludes is not None:
+            self.st_querys=[st_query for st_query in self.st_querys if st_query.st_query not in excludes]
         
         self.tokenizer=tokenizer
         self.st_querys=pd.Series(self.st_querys)

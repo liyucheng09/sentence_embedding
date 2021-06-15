@@ -36,7 +36,7 @@ class OneRun:
         return any(answer[0] in self.gold for answer in getattr(self, 'top'+str(topk)))
 
 class EvalSession:
-    def __init__(self, recall_json, func):
+    def __init__(self, recall_json, func, specify=None):
         with open(recall_json, encoding='utf-8') as f:
             self.data=json.load(f)
         self.all_sents=set()
@@ -47,6 +47,9 @@ class EvalSession:
         self._vectorizing(func)
 
         self.runs = [OneRun(query, value) for query, value in self.data.items()]
+        if specify is not None:
+            self.runs = [run for run in self.runs if any([gold in specify for gold in run.gold])]
+
         for run in self.runs:
             run.vectorizing(self.sent2vec)
     
@@ -85,7 +88,8 @@ if __name__ == '__main__':
     model_path='../Qsumm/bert-base-chinese-local'
     model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='first_last_avg_pooling')
 
-    eval=EvalSession(recall_json, model.get_embeddings)
+    excludes=['如何查看商家退货地址？', '如何申请退款/退货？', '快递停滞不更新']
+    eval=EvalSession(recall_json, model.get_embeddings, specify=excludes)
     acc=eval.acc(int(topk))
     print('ACC: ', acc)
 #     eval.output(['top'+topk], f'top{topk}_after_recall.json', extra={'ACC':acc}, only_negative=True)

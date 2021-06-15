@@ -23,7 +23,9 @@ if __name__ == '__main__':
     )
     
     tokenizer = get_tokenizer(tokenizer_path, is_zh=True)
-    ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=4000, repeat=False, csv=True)
+
+    excludes=['如何查看商家退货地址？', '如何申请退款/退货？', '快递停滞不更新']
+    ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=4000, repeat=False, csv=True, excludes=excludes)
 #     eval_ds = SimCSEEvalDSForYEZI(test_table, tokenizer)
 
     model=get_model(SimCSE, model_path, cache_dir='../model_cache')
