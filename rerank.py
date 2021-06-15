@@ -4,13 +4,7 @@ from lyc.data import get_hf_ds_scripts_path, get_tokenized_ds
 from utils import RerankDSForYEZITrain
 import sys
 from transformers import BertForSequenceClassification
-
-class rerank(BertForSequenceClassification):
-    def forward(self, input_ids, attention_mask, token_type_ids, labels=None, **kwargs):
-        if input_ids.shape[0]==1 and len(input_ids.shape)==3:
-            input_ids, attention_mask, token_type_ids, labels = [i.squeeze(0) if i is not None else None for i in [input_ids, attention_mask, token_type_ids, labels]]
-        output = super().forward(input_ids, attention_mask, token_type_ids, labels=labels, **kwargs)
-        return output
+from model import rerank
 
 if __name__ == '__main__':
     model_path, tokenizer_path, faq_table = sys.argv[1:]

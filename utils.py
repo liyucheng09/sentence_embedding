@@ -83,6 +83,8 @@ def get_vectors(model, tokenized_a, tokenized_b=None, pool='first_last_avg_pooli
     return output
 
 def to_gpu(inputs):
+    if not torch.cuda.is_available():
+        return inputs
     if isinstance(inputs, dict):
         return {
             k:v.to('cuda') for k,v in inputs.items()
@@ -288,6 +290,18 @@ class RerankDSForYEZITrain(IterableDataset):
 
     def __len__(self):
         return self.steps
+
+class RerankEval(Dataset):
+    def __init__(self, encoding):
+        self.encoding = encoding
+    
+    def __getitem__(self, index):
+        return {
+            k:v[index] for k,v in self.encoding.items()
+        }
+    
+    def __len__(self):
+        return len(self.encoding['input_ids'])
 
 class SimCSEEvalDSForYEZI(IterableDataset):
 
