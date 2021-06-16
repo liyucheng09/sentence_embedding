@@ -170,7 +170,7 @@ class Sentence(BertModel):
         return sentence_embedding
     
 class SimCSE(BertModel):
-    
+
     def forward(self, input_ids, attention_mask, token_type_ids, labels=None, **kwargs):
         if input_ids.shape[0]==1 and len(input_ids.shape)==3:
             input_ids, attention_mask, token_type_ids, labels = [i.squeeze(0) if i is not None else None for i in [input_ids, attention_mask, token_type_ids, labels]]
@@ -180,8 +180,13 @@ class SimCSE(BertModel):
             return (embs,)
         embs=vector_l2_normlize(embs)
         sims=torch.matmul(embs, embs.T)
+        if self.config.binary:
+            sims.clip_(0,1)
+            labels = F.one_hot(labels).float()
+            mask = 1-torch.eye(embs.shape[0]).to(self.device)
+            loss = F.binary_cross_entropy(sims, labels, weight=mask)
+            return (loss, embs, )
         sims=sims*20 - torch.eye(embs.shape[0]).to(self.device)*1e12
-
         loss=F.cross_entropy(sims, labels)
         return (loss, embs, )
 
