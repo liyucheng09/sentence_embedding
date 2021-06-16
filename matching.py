@@ -33,7 +33,6 @@ def matching(input_query, st_querys, vectorizing_func, threshold=0.63, recall=No
 if __name__=='__main__':
 
     faq_table, test_set = sys.argv[1:]
-#     model_path='../Qsumm/bert-base-chinese-local'
     model_path='checkpoints/simcse4/checkpoint-1000/'
     faq_table = pd.read_excel(faq_table, usecols='A,B', header=None)
 
@@ -45,7 +44,6 @@ if __name__=='__main__':
         st_querys.append(st_query)
     
     model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='cls')
-#     model = SimCSEPipeline(model_path, model_path)
     time1=time.time()
     for st_query in st_querys:
         st_query.vectorizing(model.get_embeddings)

@@ -24,12 +24,9 @@ if __name__ == '__main__':
     
     tokenizer = get_tokenizer(tokenizer_path, is_zh=True)
 
-    excludes=['如何查看商家退货地址？', '如何申请退款/退货？', '快递停滞不更新']
-    ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=4000, repeat=False, csv=True, excludes=excludes)
-#     eval_ds = SimCSEEvalDSForYEZI(test_table, tokenizer)
+    ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=4000, repeat=False, csv=True)
 
     model=get_model(SimCSE, model_path, cache_dir='../model_cache')
-#     optimizer=get_optimizer_and_schedule(model.parameters(), lr=1e-5)
 
     trainer=HfTrainer(
         model=model,

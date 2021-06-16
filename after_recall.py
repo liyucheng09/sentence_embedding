@@ -88,8 +88,7 @@ if __name__ == '__main__':
     model_path='../Qsumm/bert-base-chinese-local'
     model = SentenceEmbedding(model_path, kernel_bias_path='kernel_path/', pool='first_last_avg_pooling')
 
-    excludes=['如何查看商家退货地址？', '如何申请退款/退货？', '快递停滞不更新']
-    eval=EvalSession(recall_json, model.get_embeddings, specify=excludes)
+    eval=EvalSession(recall_json, model.get_embeddings)
     acc=eval.acc(int(topk))
     print('ACC: ', acc)
 #     eval.output(['top'+topk], f'top{topk}_after_recall.json', extra={'ACC':acc}, only_negative=True)
