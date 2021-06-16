@@ -27,6 +27,7 @@ if __name__ == '__main__':
     ds = SimCSEDSForYEZI(faq_table, tokenizer, steps=4000, repeat=False, csv=True)
 
     model=get_model(SimCSE, model_path, cache_dir='../model_cache')
+    model.config.binary=True
 
     trainer=HfTrainer(
         model=model,
