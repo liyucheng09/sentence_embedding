@@ -121,7 +121,6 @@ def get_dataloader(tokenized_a, tokenized_b, batch_size=16, label=None):
     dl = DataLoader(ds, batch_size=batch_size, shuffle=True, pin_memory=True)
 
     return dl
-
         
 def compute_kernel_bias(vecs):
     vecs=np.concatenate(vecs)
