@@ -46,7 +46,7 @@ FAQ交互式精排将输入与标准问拼接后输入模型，判断其匹配�
 `model.py`
 - `SentencePairEmbedding`: `SentenceBert`模型。
 - `SimCSE`: 对比学习
-- `rerank`: 交互式精排
+- `rerank`: 交互式精排，即句子对的分类
 - `SingleSentenceEmbedding`: 可以通过torch.jit包装的句向量model。用于venus trpc部署。
 
 ## 评测
